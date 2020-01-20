@@ -77,6 +77,7 @@ class AppWindow():
         self.canvas.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH)
 
         self.font = tkfont.Font(family="Consolas", size=9)
+        self.font2 = tkfont.Font(family="Consolas", size=8)
 
         self.row_count = 0
         # self.slots = []
@@ -115,6 +116,10 @@ class AppWindow():
     def draw(self, t, sip, sport, dip, dport):
         y = self.row_count * 16 + 30
 
+        # background
+        if self.row_count % 2:
+            self.canvas.create_rectangle(0, y-5, 1000, y+5, outline="#FFF", fill="#FFF")
+
         # slot 0: timestamp
         self._draw_on_canvas(30, y, t)
         sslotnum = self.get_slotnum_by_ip(sip)
@@ -133,11 +138,24 @@ class AppWindow():
             self.canvas.create_line(
                 self.xpos_by_slotnum(sslotnum) + xoffset, y + yoffset,
                 self.xpos_by_slotnum(sslotnum) + xoffset + 5, y + yoffset - 3)
+            # left portnum sport
+            self.canvas.create_text(self.xpos_by_slotnum(sslotnum) + xoffset - 20, y + yoffset,
+                text=f'{str(sport):>5}', font=self.font2)
+            # right portnum sport
+            self.canvas.create_text(self.xpos_by_slotnum(dslotnum) + xoffset + 20, y + yoffset,
+                text=f'{str(dport):<5}', font=self.font2)
         else:
             # right to left
             self.canvas.create_line(
                 self.xpos_by_slotnum(sslotnum) + xoffset, y + yoffset,
                 self.xpos_by_slotnum(sslotnum) + xoffset - 5, y + yoffset - 3)
+            # left portnum sport
+            self.canvas.create_text(self.xpos_by_slotnum(dslotnum) + xoffset - 20, y + yoffset,
+                text=f'{str(sport):>5}', font=self.font2)
+            # right portnum sport
+            self.canvas.create_text(self.xpos_by_slotnum(sslotnum) + xoffset + 20, y + yoffset,
+                text=f'{str(dport):<5}', font=self.font2)
+
         self.row_count += 1
 
     def update_height(self):
@@ -174,10 +192,11 @@ if __name__ == '__main__':
     i = 0
     for packet in j:
         # output(packet['pcap'])
-        app.draw(packet['time'], packet['sip'], packet['sport'], packet['dip'], packet['sport'])
+        app.draw(packet['time'], packet['sip'], packet['sport'], packet['dip'], packet['dport'])
         i += 1
-        if i > 200:
-            break
+        # if i > 200:
+        #     break
+    print('total packets:', i)
     app.update_height()
 
     w.mainloop()
