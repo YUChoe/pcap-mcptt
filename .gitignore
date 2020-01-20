@@ -1,0 +1,6 @@
+.venv
+*.pcap
+*.pcapng
+*.pkl
+.vscode
+*.code-workspace
