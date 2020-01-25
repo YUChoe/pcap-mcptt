@@ -68,7 +68,6 @@ class AppWindow():
     def __init__(self, win):
         self.win = win
         self.canvas = tk.Canvas(self.win)
-        # self.canvas.config(scrollregion=(0, 0, 800, 3000))
         sbar = tk.Scrollbar(self.win)
         sbar.config(command=self.canvas.yview)
         self.canvas.config(yscrollcommand=sbar.set)
@@ -76,11 +75,12 @@ class AppWindow():
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
         self.canvas.bind("<ButtonRelease-1>", self._on_click)
         self.canvas.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH)
+        self.canvas_width = 750
 
         self.font = tkfont.Font(family="Consolas", size=9)
         self.font2 = tkfont.Font(family="Consolas", size=8)
 
-        self.text = tk.Text(win, width=60, height=100, font=self.font2)
+        self.text = tk.Text(win, width=90, height=100, font=self.font2)
         self.text.pack(side='right')
 
         self.row_count = 0
@@ -124,7 +124,7 @@ class AppWindow():
         return 0
 
     def xpos_by_slotnum(self, sn):
-        return sn * 120 + 200
+        return sn * 100 + 200
 
     def _draw_on_canvas(self, pos_x, pos_y, s):
         self.canvas.create_text(pos_x+100, pos_y, text=s, font=self.font)
@@ -138,11 +138,11 @@ class AppWindow():
 
         # background
         if self.row_count % 2:
-            self.canvas.create_rectangle(0, y-5, 1000, y+5, outline="#FFF", fill="#FFF")
+            self.canvas.create_rectangle(0, y-5, self.canvas_width, y+5, outline="#FFF", fill="#FFF")
 
         self.pcaps[t] = {
                 'x1': 0, 'y1': y - 5,
-                'x2': 1000, 'y2': y + 5,
+                'x2': self.canvas_width, 'y2': y + 5,
                 'pcap': pcap}
 
         # slot 0: timestamp
@@ -189,7 +189,7 @@ class AppWindow():
 
     def update_height(self):
         y = self.row_count * 16 + 30
-        self.canvas.config(scrollregion=(0, 0, 1000, y + 100))
+        self.canvas.config(scrollregion=(0, 0, self.canvas_width, y + 100))
 
         # ipaddr on app
         xoffset = 45
@@ -201,13 +201,13 @@ class AppWindow():
                 self.xpos_by_slotnum(slotnum) + xoffset, y + 50)
 
 
-__version = '2'
+__version = '3'
 
 
 if __name__ == '__main__':
     w = tk.Tk()
     app = AppWindow(w)
-    w.geometry("1350x800+150+150")
+    w.geometry("1270x800+150+150")
     w.title(f'MCPTT-pcap parser v{__version}')
     w.resizable(True, True)
 
