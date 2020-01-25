@@ -8,25 +8,20 @@ import hashlib
 import os
 import pickle
 import time
+import sys
 
 
 tracking_ipaddrs = []
-tracking_ipaddrs.append('10.100.1.120')  # terminal
-tracking_ipaddrs.append('175.223.18.165')  # syj LTE terminal
+# tracking_ipaddrs.append('10.100.1.120')  # terminal
+# tracking_ipaddrs.append('175.223.18.165')  # syj LTE terminal
 # tracking_ipaddrs.append('10.100.1.27')  # terminal
+tracking_ipaddrs.append('223.62.212.32')
 
 tracking_ipaddrs.append('27.1.48.212')  # SBC-ext
 tracking_ipaddrs.append('10.200.1.5')  # SBC-int
 
 tracking_ipaddrs.append('10.200.1.80')  # CSCF
 tracking_ipaddrs.append('27.1.48.217')  # MRU
-
-pcapfiles = []
-# pcapfiles.append('invite_success_sip00.pcap')
-# pcapfiles.append('dump-20200113-190506.pcap')
-# pcapfiles.append('dump-20200113-203316.pcap')
-# pcapfiles.append('dump-20200113-203532.pcap')
-pcapfiles.append('t1.pcap')
 
 
 def gethash(s):
@@ -43,25 +38,30 @@ def output_briefly(packet):
 
 
 def save_as_json(pcap_filename):
+    st = time.time()
+    print(f'Start: {pcap_filename}')
     j = []
-    for pcapfilename in pcapfiles:
-        with pyshark.FileCapture(pcapfilename) as pcap:
-            for packet in pcap:
-                if 'IP' in packet:
-                    proto = packet.layers[2]
-                    if proto.layer_name == 'udp':
-                        if packet.ip.src in tracking_ipaddrs and packet.ip.dst in tracking_ipaddrs:
-                            d = {}
-                            d['time'] = str(packet.sniff_time)
-                            d['sip'] = str(packet.ip.src)
-                            d['sport'] = int(proto.srcport)
-                            d['dip'] = str(packet.ip.dst)
-                            d['dport'] = int(proto.dstport)
-                            d['pcap'] = packet  # pickle.dumps(packet)
-                            j.append(d)
-                            # output(packet)
-    with open('pcap.pkl', 'wb') as fp:
+    with pyshark.FileCapture(pcap_filename) as pcap:
+        for packet in pcap:
+            if 'IP' in packet:
+                proto = packet.layers[2]
+                if proto.layer_name == 'udp':
+                    if packet.ip.src in tracking_ipaddrs and packet.ip.dst in tracking_ipaddrs:
+                        d = {}
+                        d['time'] = str(packet.sniff_time)
+                        d['sip'] = str(packet.ip.src)
+                        d['sport'] = int(proto.srcport)
+                        d['dip'] = str(packet.ip.dst)
+                        d['dport'] = int(proto.dstport)
+                        d['udp'] = packet
+                        j.append(d)
+    print(f'Parsed: {time.time() - st}')
+
+    print(f'Saving:{pcap_filename}.pkl')
+    st = time.time()
+    with open(f'{pcap_filename}.pkl', 'wb') as fp:
         pickle.dump(j, fp)
+    print(f'Finished: {time.time() - st}')
 
 
 class AppWindow():
@@ -74,16 +74,19 @@ class AppWindow():
         self.canvas.config(yscrollcommand=sbar.set)
         sbar.pack(side=tk.RIGHT, fill=tk.Y)
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+        self.canvas.bind("<ButtonRelease-1>", self._on_click)
         self.canvas.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH)
 
         self.font = tkfont.Font(family="Consolas", size=9)
         self.font2 = tkfont.Font(family="Consolas", size=8)
 
+        self.text = tk.Text(win, width=60, height=100, font=self.font2)
+        self.text.pack(side='right')
+
         self.row_count = 0
-        # self.slots = []
 
         # static value for testing
-        s1 = ['10.100.1.120', '175.223.18.165', '10.100.1.27']
+        s1 = ['223.62.212.32', '10.100.1.120', '175.223.18.165', '10.100.1.27']
         s2 = ['27.1.48.212']
         s3 = ['10.200.1.5']
         s4 = ['10.200.1.80']
@@ -92,6 +95,23 @@ class AppWindow():
 
         self.datas = []
         # self.fflag = True
+        self.pcaps = {}
+
+    def _on_click(self, event):
+        x = event.x
+        y = event.y
+        ts, pcap = self.which_pcap(x, y)
+        if pcap:
+            udp = pcap['pcap']['udp']
+            # print(x, y, ts, udp)
+            self.text.insert(1.0, udp)
+
+    def which_pcap(self, x, y):
+        for ts, p in self.pcaps.items():
+            if p['y1'] <= y <= p['y2']:
+                return ts, p
+        else:
+            return None, None
 
     def _on_mousewheel(self, event):
         self.canvas.yview_scroll(int(-1*(event.delta/120)), "units")
@@ -113,12 +133,17 @@ class AppWindow():
         slot = tk.Label(self.win, text=s, font=self.font)
         slot.place(x=pos_x, y=pos_y)
 
-    def draw(self, t, sip, sport, dip, dport):
+    def draw(self, t, sip, sport, dip, dport, pcap):
         y = self.row_count * 16 + 30
 
         # background
         if self.row_count % 2:
             self.canvas.create_rectangle(0, y-5, 1000, y+5, outline="#FFF", fill="#FFF")
+
+        self.pcaps[t] = {
+                'x1': 0, 'y1': y - 5,
+                'x2': 1000, 'y2': y + 5,
+                'pcap': pcap}
 
         # slot 0: timestamp
         self._draw_on_canvas(30, y, t)
@@ -136,25 +161,29 @@ class AppWindow():
         if sslotnum < dslotnum:
             # left to right
             self.canvas.create_line(
-                self.xpos_by_slotnum(sslotnum) + xoffset, y + yoffset,
-                self.xpos_by_slotnum(sslotnum) + xoffset + 5, y + yoffset - 3)
+                self.xpos_by_slotnum(dslotnum) + xoffset, y + yoffset,
+                self.xpos_by_slotnum(dslotnum) + xoffset - 5, y + yoffset - 3)
             # left portnum sport
-            self.canvas.create_text(self.xpos_by_slotnum(sslotnum) + xoffset - 20, y + yoffset,
+            self.canvas.create_text(
+                self.xpos_by_slotnum(sslotnum) + xoffset - 20, y + yoffset,
                 text=f'{str(sport):>5}', font=self.font2)
             # right portnum sport
-            self.canvas.create_text(self.xpos_by_slotnum(dslotnum) + xoffset + 20, y + yoffset,
+            self.canvas.create_text(
+                self.xpos_by_slotnum(dslotnum) + xoffset + 20, y + yoffset,
                 text=f'{str(dport):<5}', font=self.font2)
         else:
             # right to left
             self.canvas.create_line(
-                self.xpos_by_slotnum(sslotnum) + xoffset, y + yoffset,
-                self.xpos_by_slotnum(sslotnum) + xoffset - 5, y + yoffset - 3)
+                self.xpos_by_slotnum(dslotnum) + xoffset, y + yoffset,
+                self.xpos_by_slotnum(dslotnum) + xoffset + 5, y + yoffset - 3)
             # left portnum sport
-            self.canvas.create_text(self.xpos_by_slotnum(dslotnum) + xoffset - 20, y + yoffset,
-                text=f'{str(sport):>5}', font=self.font2)
+            self.canvas.create_text(
+                self.xpos_by_slotnum(sslotnum) + xoffset + 20, y + yoffset,
+                text=f'{str(sport):<5}', font=self.font2)
             # right portnum sport
-            self.canvas.create_text(self.xpos_by_slotnum(sslotnum) + xoffset + 20, y + yoffset,
-                text=f'{str(dport):<5}', font=self.font2)
+            self.canvas.create_text(
+                self.xpos_by_slotnum(dslotnum) + xoffset - 20, y + yoffset,
+                text=f'{str(dport):>5}', font=self.font2)
 
         self.row_count += 1
 
@@ -172,27 +201,35 @@ class AppWindow():
                 self.xpos_by_slotnum(slotnum) + xoffset, y + 50)
 
 
+__version = '2'
+
 
 if __name__ == '__main__':
-    if not os.path.isfile('pcap.pkl'):
-        save_as_json('t1.pcap')
+    w = tk.Tk()
+    app = AppWindow(w)
+    w.geometry("1350x800+150+150")
+    w.title(f'MCPTT-pcap parser v{__version}')
+    w.resizable(True, True)
+
+    if len(sys.argv) < 2:
+        pcap_filepath = 't1.pcap'
+    else:
+        pcap_filepath = sys.argv[1]
+
+    if not os.path.isfile(f'{pcap_filepath}.pkl'):
+        save_as_json(pcap_filepath)
 
     bt = time.time()
     j = []
-    with open('pcap.pkl', 'rb') as fp:
+
+    with open(f'{pcap_filepath}.pkl', 'rb') as fp:
         j = pickle.load(fp)
     print('loading time: ', time.time() - bt)
-
-    w = tk.Tk()
-    app = AppWindow(w)
-    w.geometry("1000x600+200+200")
-    w.title('MCPTT-pcap parser v1')
-    w.resizable(True, True)
 
     i = 0
     for packet in j:
         # output(packet['pcap'])
-        app.draw(packet['time'], packet['sip'], packet['sport'], packet['dip'], packet['dport'])
+        app.draw(packet['time'], packet['sip'], packet['sport'], packet['dip'], packet['dport'], packet)
         i += 1
         # if i > 200:
         #     break
