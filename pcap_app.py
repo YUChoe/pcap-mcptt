@@ -124,7 +124,7 @@ class AppWindow():
         return 0
 
     def xpos_by_slotnum(self, sn):
-        return sn * 150 + 200
+        return sn * 120 + 200
 
     def _draw_on_canvas(self, pos_x, pos_y, s):
         self.canvas.create_text(pos_x+100, pos_y, text=s, font=self.font)
