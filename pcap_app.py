@@ -75,7 +75,7 @@ class AppWindow():
         self.canvas.bind_all("<MouseWheel>", self._on_mousewheel)
         self.canvas.bind("<ButtonRelease-1>", self._on_click)
         self.canvas.pack(side=tk.LEFT, expand=tk.YES, fill=tk.BOTH)
-        self.canvas_width = 750
+        self.canvas_width = 1050
 
         self.font = tkfont.Font(family="Consolas", size=9)
         self.font2 = tkfont.Font(family="Consolas", size=8)
@@ -104,6 +104,7 @@ class AppWindow():
         ts, pcap = self.which_pcap(x, y)
         if pcap:
             udp = pcap['pcap']['udp']
+            self.text.delete(1.0, tk.END)
             self.text.insert(1.0, udp)
 
     def which_pcap(self, x, y):
@@ -124,7 +125,13 @@ class AppWindow():
         return 0
 
     def xpos_by_slotnum(self, sn):
-        return sn * 120 + 300
+        if sn == 0 or sn == 1:
+            return sn * 200 + 250
+        elif sn == 2:
+            return 2 * 150 + 250
+        else:
+            return sn * 200 + 250 - 100
+
 
     def _draw_on_canvas(self, pos_x, pos_y, s):
         self.canvas.create_text(pos_x+100, pos_y, text=s, font=self.font2)
@@ -145,7 +152,7 @@ class AppWindow():
                 'x2': self.canvas_width, 'y2': y + 5,
                 'pcap': pcap}
 
-        # slot 0: timestamp
+        # slot 0: timestamp and packet size (Except ip 20 bytes)
         self._draw_on_canvas(10, y, f'{t}')
         self._draw_on_canvas(110, y, f'({pcap["udp"].length})')
         sslotnum = self.get_slotnum_by_ip(sip)
@@ -160,12 +167,18 @@ class AppWindow():
 
         # SIP
         sip_msg = ''
+        media_ports = []
         if 'udp' in pcap and 'sip' in pcap['udp']:
             if hasattr(pcap['udp'].sip, 'method'):
                 sip_msg = str(pcap['udp'].sip.method).strip()
             else:
                 sip_msg = str(pcap['udp'].sip.cseq).strip().split()[1]
 
+            if sip_msg == 'INVITE':
+                for l in str(pcap['udp'].sip).split('\n'):
+                    if len(media_ports) < 3:
+                        if 'Media Description, name and address (m)' in l:
+                            media_ports.append(l.split(':')[1].strip().split()[1])
             if sip_msg in self.sip_methods:
                 if hasattr(pcap['udp'].sip, 'status_code'):
                     sip_msg = str(pcap['udp'].sip.status_code)
@@ -186,9 +199,11 @@ class AppWindow():
                 text=f'{str(dport):<5}', font=self.font2)
             # sip_msg
             if sip_msg:
+                if media_ports:
+                    sip_msg = f'{sip_msg}({media_ports[0]}, {media_ports[1]}, {media_ports[2]})'
                 self.canvas.create_text(
-                    self.xpos_by_slotnum(sslotnum) + xoffset + 20 + 7, y + yoffset - 5,
-                    text=f'{sip_msg:<8}', font=self.font2)
+                    self.xpos_by_slotnum(sslotnum) + xoffset + 5, y + yoffset - 11,
+                    text=f'{sip_msg:<8}', font=self.font2, anchor='nw')
         else:
             # right to left
             self.canvas.create_line(
@@ -204,9 +219,11 @@ class AppWindow():
                 text=f'{str(dport):>5}', font=self.font2)
             # sip_msg
             if sip_msg:
+                if media_ports:
+                    sip_msg = f'({media_ports[0]}, {media_ports[1]}, {media_ports[2]}){sip_msg}'
                 self.canvas.create_text(
-                    self.xpos_by_slotnum(sslotnum) + xoffset - 20 - 5, y + yoffset - 5,
-                    text=f'{sip_msg:>8}', font=self.font2)
+                    self.xpos_by_slotnum(sslotnum) + xoffset - 5, y + yoffset - 11,
+                    text=f'{sip_msg:>8}', font=self.font2, anchor='ne')
 
         self.row_count += 1
 
@@ -230,7 +247,7 @@ __version = '3'
 if __name__ == '__main__':
     w = tk.Tk()
     app = AppWindow(w)
-    w.geometry("1270x800+150+150")
+    w.geometry("1600x1000+150+150")
     w.title(f'MCPTT-pcap parser v{__version}')
     w.resizable(True, True)
 
