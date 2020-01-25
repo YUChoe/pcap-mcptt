@@ -146,7 +146,8 @@ class AppWindow():
                 'pcap': pcap}
 
         # slot 0: timestamp
-        self._draw_on_canvas(10, y, f'{t} ({pcap["udp"].length})')
+        self._draw_on_canvas(10, y, f'{t}')
+        self._draw_on_canvas(110, y, f'({pcap["udp"].length})')
         sslotnum = self.get_slotnum_by_ip(sip)
         dslotnum = self.get_slotnum_by_ip(dip)
 
