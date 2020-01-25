@@ -124,7 +124,7 @@ class AppWindow():
         return 0
 
     def xpos_by_slotnum(self, sn):
-        return sn * 150 + 250
+        return sn * 150 + 200
 
     def _draw_on_canvas(self, pos_x, pos_y, s):
         self.canvas.create_text(pos_x+100, pos_y, text=s, font=self.font)
@@ -146,7 +146,7 @@ class AppWindow():
                 'pcap': pcap}
 
         # slot 0: timestamp
-        self._draw_on_canvas(30, y, t)
+        self._draw_on_canvas(10, y, t)
         sslotnum = self.get_slotnum_by_ip(sip)
         dslotnum = self.get_slotnum_by_ip(dip)
 
