@@ -83,6 +83,7 @@ class AppWindow():
         self.text = tk.Text(win, width=90, height=100, font=self.font2)
         self.text.pack(side='right')
 
+        self.sip_methods = ['REGISTER', 'INVITE', 'REFER']
         self.row_count = 0
 
         # static value for testing
@@ -103,7 +104,6 @@ class AppWindow():
         ts, pcap = self.which_pcap(x, y)
         if pcap:
             udp = pcap['pcap']['udp']
-            # print(x, y, ts, udp)
             self.text.insert(1.0, udp)
 
     def which_pcap(self, x, y):
@@ -124,10 +124,10 @@ class AppWindow():
         return 0
 
     def xpos_by_slotnum(self, sn):
-        return sn * 100 + 200
+        return sn * 120 + 300
 
     def _draw_on_canvas(self, pos_x, pos_y, s):
-        self.canvas.create_text(pos_x+100, pos_y, text=s, font=self.font)
+        self.canvas.create_text(pos_x+100, pos_y, text=s, font=self.font2)
 
     def _draw(self, pos_x, pos_y, s):
         slot = tk.Label(self.win, text=s, font=self.font)
@@ -146,7 +146,7 @@ class AppWindow():
                 'pcap': pcap}
 
         # slot 0: timestamp
-        self._draw_on_canvas(10, y, t)
+        self._draw_on_canvas(10, y, f'{t} ({pcap["udp"].length})')
         sslotnum = self.get_slotnum_by_ip(sip)
         dslotnum = self.get_slotnum_by_ip(dip)
 
@@ -157,12 +157,24 @@ class AppWindow():
             self.xpos_by_slotnum(sslotnum) + xoffset, y + yoffset,
             self.xpos_by_slotnum(dslotnum) + xoffset, y + yoffset)
 
+        # SIP
+        sip_msg = ''
+        if 'udp' in pcap and 'sip' in pcap['udp']:
+            if hasattr(pcap['udp'].sip, 'method'):
+                sip_msg = str(pcap['udp'].sip.method).strip()
+            else:
+                sip_msg = str(pcap['udp'].sip.cseq).strip().split()[1]
+
+            if sip_msg in self.sip_methods:
+                if hasattr(pcap['udp'].sip, 'status_code'):
+                    sip_msg = str(pcap['udp'].sip.status_code)
+
         # arrow
         if sslotnum < dslotnum:
             # left to right
             self.canvas.create_line(
                 self.xpos_by_slotnum(dslotnum) + xoffset, y + yoffset,
-                self.xpos_by_slotnum(dslotnum) + xoffset - 5, y + yoffset - 3)
+                self.xpos_by_slotnum(dslotnum) + xoffset - 7, y + yoffset - 3)
             # left portnum sport
             self.canvas.create_text(
                 self.xpos_by_slotnum(sslotnum) + xoffset - 20, y + yoffset,
@@ -171,11 +183,16 @@ class AppWindow():
             self.canvas.create_text(
                 self.xpos_by_slotnum(dslotnum) + xoffset + 20, y + yoffset,
                 text=f'{str(dport):<5}', font=self.font2)
+            # sip_msg
+            if sip_msg:
+                self.canvas.create_text(
+                    self.xpos_by_slotnum(sslotnum) + xoffset + 20 + 7, y + yoffset - 5,
+                    text=f'{sip_msg:<8}', font=self.font2)
         else:
             # right to left
             self.canvas.create_line(
                 self.xpos_by_slotnum(dslotnum) + xoffset, y + yoffset,
-                self.xpos_by_slotnum(dslotnum) + xoffset + 5, y + yoffset - 3)
+                self.xpos_by_slotnum(dslotnum) + xoffset + 7, y + yoffset - 3)
             # left portnum sport
             self.canvas.create_text(
                 self.xpos_by_slotnum(sslotnum) + xoffset + 20, y + yoffset,
@@ -184,6 +201,11 @@ class AppWindow():
             self.canvas.create_text(
                 self.xpos_by_slotnum(dslotnum) + xoffset - 20, y + yoffset,
                 text=f'{str(dport):>5}', font=self.font2)
+            # sip_msg
+            if sip_msg:
+                self.canvas.create_text(
+                    self.xpos_by_slotnum(sslotnum) + xoffset - 20 - 5, y + yoffset - 5,
+                    text=f'{sip_msg:>8}', font=self.font2)
 
         self.row_count += 1
 
